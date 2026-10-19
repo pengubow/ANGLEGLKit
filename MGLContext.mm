@@ -65,19 +65,27 @@ void Throw(NSString *msg)
 
 EGLContext CreateEGLContext(EGLDisplay display, MGLRenderingAPI api, EGLContext sharedContext)
 {
-    // Init config
-    std::vector<EGLint> surfaceAttribs = {
-        EGL_RED_SIZE,       EGL_DONT_CARE, EGL_GREEN_SIZE,   EGL_DONT_CARE,
-        EGL_BLUE_SIZE,      EGL_DONT_CARE, EGL_ALPHA_SIZE,   EGL_DONT_CARE,
-        EGL_DEPTH_SIZE,     EGL_DONT_CARE, EGL_STENCIL_SIZE, EGL_DONT_CARE,
-        EGL_SAMPLE_BUFFERS, EGL_DONT_CARE, EGL_SAMPLES,      EGL_DONT_CARE,
-    };
-    surfaceAttribs.push_back(EGL_NONE);
-    EGLConfig config;
-    EGLint numConfigs;
-    if (!eglChooseConfig(display, surfaceAttribs.data(), &config, 1, &numConfigs) || numConfigs < 1)
+    // ANGLE only makes a context current with surfaces whose depth/stencil sizes match the
+    // context's config, but layers pick their depth/stencil formats after the context exists.
+    // A context without a config can be used with any surface.
+    EGLConfig config = EGL_NO_CONFIG_KHR;
+    const char *extensions = eglQueryString(display, EGL_EXTENSIONS);
+    if (!extensions || !strstr(extensions, "EGL_KHR_no_config_context"))
     {
-        Throw(@"Failed to call eglChooseConfig()");
+        // Init config
+        std::vector<EGLint> surfaceAttribs = {
+            EGL_RED_SIZE,       EGL_DONT_CARE, EGL_GREEN_SIZE,   EGL_DONT_CARE,
+            EGL_BLUE_SIZE,      EGL_DONT_CARE, EGL_ALPHA_SIZE,   EGL_DONT_CARE,
+            EGL_DEPTH_SIZE,     EGL_DONT_CARE, EGL_STENCIL_SIZE, EGL_DONT_CARE,
+            EGL_SAMPLE_BUFFERS, EGL_DONT_CARE, EGL_SAMPLES,      EGL_DONT_CARE,
+        };
+        surfaceAttribs.push_back(EGL_NONE);
+        EGLint numConfigs;
+        if (!eglChooseConfig(display, surfaceAttribs.data(), &config, 1, &numConfigs) ||
+            numConfigs < 1)
+        {
+            Throw(@"Failed to call eglChooseConfig()");
+        }
     }
 
     // Init context
