@@ -1,0 +1,34 @@
+name: Build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Theos
+        run: |
+          brew install ldid
+          git clone --depth 1 --recursive https://github.com/theos/theos.git "$HOME/theos"
+          echo "THEOS=$HOME/theos" >> "$GITHUB_ENV"
+
+      - name: Build
+        run: make FINALPACKAGE=1
+
+      - name: Package with ANGLE libraries
+        run: |
+          mkdir -p out
+          cp -R .theos/obj/ANGLEGLKit.framework out/
+          # The repo only has .tbd stubs, take the real libEGL/libGLESv2 from the upstream release
+          curl -fsSL -o angle.zip https://github.com/khanhduytran0/ANGLEGLKit/releases/download/1.0/ANGLEGLKit.zip
+          unzip -q angle.zip 'libEGL.framework/*' 'libGLESv2.framework/*' -d out
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ANGLEGLKit
+          path: out
